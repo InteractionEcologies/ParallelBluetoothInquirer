@@ -1,0 +1,32 @@
+
+./inq -n 6 -l 1 -d # Running inquiry
+
+
+
+#********important ***************
+#check where ur "pidof" is installed by doing ---> #whereis pidof
+#in my case it is in /sbin/pidof so im putting it in my next line...
+#*********************************
+
+
+t=`/bin/pidof inq` # checking pid to see if noatun is running
+
+
+
+while [ -n "$t" ] # while inq is running
+do
+t=`/bin/pidof inq` 
+# ********the line i forgot in my last post************
+done
+
+
+if [ -z "$t" ] 
+# If iq process not running , 'pidof' returns null.
+then
+echo " "
+echo "Process inq not running."
+echo " "
+
+fi # end of if condition
+
+exit 0 # exiting without error

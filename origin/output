@@ -1,0 +1,15 @@
+length = 2
+The Dongle is in a state that refused setting periodic mode.
+It may, of course, already be in periodic mode (You -SIGKILL'd me earlier?)
+so I will just pretend that it is.
+The Dongle is in a state that refused setting periodic mode.
+It may, of course, already be in periodic mode (You -SIGKILL'd me earlier?)
+so I will just pretend that it is.
+The Dongle is in a state that refused setting periodic mode.
+It may, of course, already be in periodic mode (You -SIGKILL'd me earlier?)
+so I will just pretend that it is.
+ 00:1B:63:58:62:72 01 00 [ Capture Obex Audio ] Desktop Computer
+ 60:33:4B:0C:72:C8 01 00 [ ] Misc
+ 50:63:13:B0:8E:92 01 00 [ Net Render Capture Obex Audio ] Laptop Computer
+Exiting: Interrupted system call
+Second SIGINT received, giving up waiting for exit periodic!: Interrupted system call
