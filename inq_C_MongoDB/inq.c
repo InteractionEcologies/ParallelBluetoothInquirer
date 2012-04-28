@@ -326,6 +326,8 @@ so I will just pretend that it is.\n\
 				bson_append_int( &b, "usec", current_tv.tv_usec);
 				
 				time(&currentTime);
+			
+				bson_append_int( &b, "time", currentTime); 
 				bson_append_string( &b, "unixTime", ctime(&currentTime)); 
 				
 				sprintf(bufferForTime, "%8lu", resultime.tv_sec);
