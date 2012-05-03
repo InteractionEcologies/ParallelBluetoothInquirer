@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <math.h>
 
+#include <time.h> //Used to convert time from timestamp to human readable time
+
 #include <mysql.h>
 
 #include <bluetooth/bluetooth.h>
@@ -17,8 +19,42 @@ static unsigned char controlBuffer[100];
 
 
 static int decode(int msgLengthFromBTSocket, struct timeval timeStamp);
-void decodeBTMsg(inquiry_info * btMsg);
-void decodeBTMsgWithRSSI(inquiry_info_with_rssi * btMsg);
+void decodeBTMsg(inquiry_info * btMsg, struct timeval timeStamp);
+void decodeBTMsgWithRSSI(inquiry_info_with_rssi * btMsg, struct timeval timeStamp);
+void getClassInfo(uint8_t dev_class[3], char * classInfo);
+
+MYSQL *conn;
+
+
+#define ENT(e) (sizeof(e)/sizeof(char*))
+static char *majors[] = {"Misc", "Computer", "Phone", "Net Access", "Audio/Video",\
+                        "Peripheral", "Imaging", "Wearable", "Toy"};
+
+static char* computers[] = {"Misc", "Desktop", "Server", "Laptop", "Handheld",\
+                                "Palm", "Wearable"};
+
+static char* phones[] = {"Misc", "Cell", "Cordless", "Smart", "Wired",\
+                        "ISDN", "Sim Card Reader For "};
+
+static char* av[] = {"Misc", "Headset", "Handsfree", "Reserved", "Microphone", "Loudspeaker",\
+                "Headphones", "Portable Audio", "Car Audio", "Set-Top Box",\
+                "HiFi Audio", "Video Tape Recorder", "Video Camera",\
+                "Camcorder", "Video Display and Loudspeaker", "Video Conferencing", "Reserved",\
+                "Game / Toy"};
+
+static char* peripheral[] = {"Misc", "Joystick", "Gamepad", "Remote control", "Sensing device",\
+                "Digitiser Tablet", "Card Reader"};
+
+static char* wearable[] = {"Misc", "Wrist Watch", "Pager", "Jacket", "Helmet", "Glasses"};
+
+static char* toys[] = {"Misc", "Robot", "Vehicle", "Character", "Controller", "Game"};
+
+
+
+
+
+
+
 
 int main()
 {
@@ -42,10 +78,25 @@ int main()
 	fd_set writeSet;
 	fd_set exceptSet;
 
-	//MySQL database
-	MYSQL *conn;
-
 	//Program begin
+
+	//Database connection
+	conn = mysql_init(NULL);
+	if (conn == NULL){
+		printf("Error %u: %s\n", mysql_errno(conn), mysql_error(conn));
+		exit(1);
+	}
+
+	//mysql_real_connect( ..., database name, port number, unix socket, client flag)
+	if (mysql_real_connect(conn, "localhost", "multipleBT", "multipleBT", NULL, 0, NULL, 0) == NULL ){
+		printf("Error %u: %s\n", mysql_errno(conn), mysql_error(conn));
+		exit(1);
+	}
+
+	if (mysql_query( conn, "USE BTSignalRecords")){
+		printf("Error %u: %s\n", mysql_errno(conn), mysql_error(conn));
+		exit(1);
+	}
 
 	//initialize msgFromBTSocket
 	//assign msgBuffer to be the space for btSocket to send and receive message
@@ -156,6 +207,8 @@ int main()
 			}
 		}
 	}//end while()
+	
+	mysql_close(conn);
 	return 0;
 }
 
@@ -164,6 +217,7 @@ int main()
 static int decode(int msgLengthFromBTSocket, struct timeval timeStamp)
 {
 	int i;	
+
 	if( msgLengthFromBTSocket < 1){
 		//Packet too small
 		perror("Packet too small\n"); //print error messages to std error 
@@ -176,16 +230,29 @@ static int decode(int msgLengthFromBTSocket, struct timeval timeStamp)
 		switch( msgBuffer[1] ){
 			case EVT_INQUIRY_COMPLETE:
 				debug && printf("Message received == EVT_INQUIRY_COMPLETE\n");
+				//Don't need to do anything here, the adaptors should keep inquiry
 			break;
 			case EVT_INQUIRY_RESULT:
 				debug && printf("Message received == EVT_INQUIRY_RESULT\n");
+				
+				if(msgBuffer[2] == 0{
+					break;
+				} else if (msgBuffer[2] * sizeof(inquiry_info) + 1){
+					perror("Inquiry Result event length wrong. \n");
+					return EXIT_FAILURE;
+				} else {
+					for(i = 0; i < msgBuffer[3]; i++){
+						//Decode and add into database
+						decodeBTMsg( (inquiry_info*)&msgBuffer[4 + i * sizeof(inquiry_info)], timeStamp );	
+				}
 						
 			break;
 			case EVT_REMOTE_NAME_REQ_COMPLETE:
-				
+				//I don't think we need to use this event	
 			break;
 			case EVT_CMD_STATUS:
-				
+								
+
 			break;
 			case EVT_CMD_COMPLETE:
 				debug && printf("Message received == EVT_CMD_COMPLETE\n");
@@ -206,7 +273,7 @@ static int decode(int msgLengthFromBTSocket, struct timeval timeStamp)
 					//Success detect inquiry result events
 					for(i = 0; i < msgBuffer[3]; i++){
 						//Decode and add into database
-						decodeBTMsgWithRSSI( (inquiry_info_with_rssi*)&msgBuffer[4 + i * sizeof(inquiry_info_with_rssi)] );	
+						decodeBTMsgWithRSSI( (inquiry_info_with_rssi*)&msgBuffer[4 + i * sizeof(inquiry_info_with_rssi)], timeStamp );	
 				
 					}
 
@@ -218,15 +285,52 @@ static int decode(int msgLengthFromBTSocket, struct timeval timeStamp)
 	return 0;
 }
 
-void decodeBTMsg(inquiry_info * btMsg)
+void decodeBTMsg(inquiry_info * btMsg, struct timeval timeStamp)
 {
 	
+	struct tm timeInDateTimeFormat;
+	char timeStampStringContainsMicroSecond[80];
+	char timeStringInDateTimeFormat[80];	
+	char btMachineID[18];
+	char queryStatement[256];
+	inquiry_info template;
+
+	template.bdaddr = btMsg->bdaddr;
+	template.dev_class[0] = btMsg->dev_class[0];
+	template.dev_class[1] = btMsg->dev_class[1];
+	template.dev_class[2] = btMsg->dev_class[2];
+	
+	ba2str(&(btMsg->bdaddr), btMachineID);
+
+	timeInDateTimeFormat = * localtime( &(timeStamp.tv_sec) ); 
+	//convert the time to a human redable format
+	strftime(timeStringInDateTimeFormat, sizeof(timeStringInDateTimeFormat), 
+		"%Y-%m-%d %H:%M:%S", &(timeInDateTimeFormat)); 
+				
+	sprintf(timeStampStringContainsMicroSecond, "%lu.%03lu\n", timeStamp.tv_sec, timeStamp.tv_usec);
+	debug && printf("timeStampStringContainsMicroSeccond = %s", timeStampStringContainsMicroSecond);
+	debug && printf("@ %s : %06lu ... \n", timeStringInDateTimeFormat, timeStamp.tv_usec);						
+	debug && printf("timeStamp.tv_sec = %8lu\n", timeStamp.tv_sec);
+	
+	//timeDate, timeStamp, timeUSec, machineID, rssi, deviceClass
+
+	snprintf(queryStatement, 256, "INSERT INTO btSignalRecords VALUES ('%s', '%s', '%lu', '%s', '0', 'deviceClass'  )", timeStringInDateTimeFormat, timeStampStringContainsMicroSecond , timeStamp.tv_usec, btMachineID);
+
+	mysql_query(conn, queryStatement);	
+
 }
 
-void decodeBTMsgWithRSSI(inquiry_info_with_rssi* btMsg)
+void decodeBTMsgWithRSSI(inquiry_info_with_rssi* btMsg, struct timeval timeStamp)
 {
+	struct tm timeInDateTimeFormat;
+	char timeStampStringContainsMicroSecond[80];
+	char timeStringInDateTimeFormat[80];	
 	char btMachineID[18];
+	char queryStatement[256];
+	char classInfo[30];	
 	inquiry_info_with_rssi template;
+
+	
 
 	template.bdaddr = btMsg->bdaddr;
 	template.dev_class[0] = btMsg->dev_class[0];
@@ -240,4 +344,84 @@ void decodeBTMsgWithRSSI(inquiry_info_with_rssi* btMsg)
 
 	//add to database here
 	//...
+	//mysql_query(conn, "");
+
+	
+	//mysql_query(conn, "INSERT INTO btSignalRecords VALUES(timeDate, timeStamp, timeUSec, machineID, rssi, deviceClass")
+
+	timeInDateTimeFormat = * localtime( &(timeStamp.tv_sec) ); 
+	//convert the time to a human redable format
+	strftime(timeStringInDateTimeFormat, sizeof(timeStringInDateTimeFormat), 
+		"%Y-%m-%d %H:%M:%S", &(timeInDateTimeFormat)); 
+				
+	sprintf(timeStampStringContainsMicroSecond, "%lu.%03lu\n", timeStamp.tv_sec, timeStamp.tv_usec);
+	debug && printf("timeStampStringContainsMicroSeccond = %s", timeStampStringContainsMicroSecond);
+	debug && printf("@ %s : %06lu ... \n", timeStringInDateTimeFormat, timeStamp.tv_usec);						
+	debug && printf("timeStamp.tv_sec = %8lu\n", timeStamp.tv_sec);
+	
+	//timeDate, timeStamp, timeUSec, machineID, rssi, deviceClass
+
+	classInfo[0] = '\0';
+	getClassInfo(btMsg->dev_class, classInfo);
+
+	debug && printf("classInfo = %s\n", classInfo);
+	snprintf(queryStatement, 256, "INSERT INTO btSignalRecords VALUES ('%s', '%s', '%lu', '%s', '%d', '%s'  )", timeStringInDateTimeFormat, timeStampStringContainsMicroSecond , timeStamp.tv_usec, btMachineID, btMsg->rssi, classInfo);
+
+	mysql_query(conn, queryStatement);	
+
+}
+
+
+void getClassInfo(uint8_t dev_class[3], char * classInfo)
+{
+	int flags = dev_class[2];
+	int major = dev_class[1];
+	int minor = dev_class[0] >> 2;
+	char buffer[30];
+
+	if (major > ENT(majors)) {
+        if (major == 63)
+           sprintf(buffer, " Unclassified device\n");
+        	strcat( classInfo, buffer);
+		return;
+    }
+    switch (major) {
+    case 1:
+        if (minor <= ENT(computers)) strcat( classInfo , computers[minor]);
+        break;
+    case 2:
+        if (minor <= ENT(phones)) strcat( classInfo, phones[minor]);
+        break;
+    case 3:
+        sprintf(buffer, " Usage %d/56", minor);
+        strcat( classInfo, buffer);
+		break;
+    case 4:
+        if (minor <= ENT(av)) sprintf(buffer," %s", av[minor]);
+        strcat( classInfo, buffer);
+		break;
+    case 5:
+        if ((minor & 0xF) <= ENT(peripheral)) sprintf(buffer," %s", peripheral[(minor & 0xF)]);
+        if (minor & 0x10) sprintf(buffer, " with keyboard");
+        if (minor & 0x20) sprintf(buffer, " with pointing device");
+        strcat( classInfo, buffer);
+		break;
+    case 6:
+        if (minor & 0x2) sprintf(buffer," with display");
+        if (minor & 0x4) sprintf(buffer, " with camera");
+        if (minor & 0x8) sprintf(buffer, " with scanner");
+        if (minor & 0x10) sprintf(buffer, " with printer");
+    	strcat( classInfo, buffer);
+	break;
+    case 7:
+        if (minor <= ENT(wearable)) sprintf(buffer, " %s", wearable[minor]);
+        strcat( classInfo, buffer);
+		break;
+    case 8:
+        if (minor <= ENT(toys)) sprintf(buffer," %s", toys[minor]);
+        strcat( classInfo, buffer);
+		break;
+    }
+    sprintf(buffer, " %s", majors[major]);
+	strcat( classInfo, buffer);
 }
