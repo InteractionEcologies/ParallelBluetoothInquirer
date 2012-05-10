@@ -23,6 +23,7 @@ class BluetoothController
 {
 public:
 	BluetoothController(int numberOfAdaptors, int inquiryTimeLength);
+	BluetoothController(int argc, char* argv[]);
 	~BluetoothController();
 	void run();
 	
@@ -35,6 +36,7 @@ private:
 	
 	//Database connection
 	MYSQL *conn;
+	string table;
 	const static char * username;
 	const static char * password;
 	const static char * host;
@@ -42,7 +44,12 @@ private:
 	//MYSQL_ROW row;
 
 	int * btSocketArray;
-	int numberOfAdaptors;
+
+	int experimentIndex;
+	int experimentDistance;
+	string  experimentInquiryScanWindow;
+	int experimentNumOfNearbyDevices; 
+	int numberOfAdaptors; // = number of inquirers
 	int inquiryTimeLength;
 		
 

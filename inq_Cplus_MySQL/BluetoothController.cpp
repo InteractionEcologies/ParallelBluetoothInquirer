@@ -34,8 +34,16 @@ BluetoothController::BluetoothController(int numberOfAdaptors, int inquiryTimeLe
 {
 	debug = 1;
 
+
+	this->table = "btSignalRecords";
 	this->numberOfAdaptors = numberOfAdaptors;
 	this->inquiryTimeLength = inquiryTimeLength;
+
+	//For Experiment
+	this->experimentIndex = 0;
+	this->experimentDistance = -1;
+	this->experimentInquiryScanWindow = "0x0000";
+	this->experimentNumOfNearbyDevices = -1;
 
 	debug && cout << "numberOfAdaptors = " << this->numberOfAdaptors << endl; 	
 	debug && cout << "inquiryTimeLength = " << this->inquiryTimeLength << endl;
@@ -74,6 +82,71 @@ BluetoothController::BluetoothController(int numberOfAdaptors, int inquiryTimeLe
 	
 }
 
+
+BluetoothController::BluetoothController(int argc, char* argv[])
+{
+	/*
+    * argv[1] = i (index)
+    * argv[2] = distance
+    * argv[3] = inquiryScanWindow
+    * argv[4] = numOfNearbyDevices
+    * argv[5] = numOfInquirers
+    * argv[6] = inquiryTimeLength
+    */  
+	
+	debug = 1;
+
+	this->table = "btSignalRecordsForExperiment";
+
+	debug && cout << "Table = " << this->table << endl;
+	//For Experiment
+	this->experimentIndex = atoi(argv[1]);
+	this->experimentDistance = atoi(argv[2]);
+	this->experimentInquiryScanWindow = argv[3];
+	this->experimentNumOfNearbyDevices = atoi(argv[4]);
+	this->numberOfAdaptors = atoi(argv[5]);
+	this->inquiryTimeLength = atoi(argv[6]);
+
+	debug && cout << "Parameters for experiment" << endl;
+	debug && cout << "Experiment Index = " << this->experimentIndex << endl;
+	debug && cout << "Distance = " << this->experimentDistance << endl;
+	debug && cout << "Inquiry Scan Window = " << this->experimentInquiryScanWindow << endl;
+	debug && cout << "Number of Nearby Devices = " << this->experimentNumOfNearbyDevices << endl;
+	debug && cout << "Number of Inquirers = " << this->numberOfAdaptors << endl; 	
+	debug && cout << "inquiryTimeLength = " << this->inquiryTimeLength << endl;
+
+	//Data base connection
+	conn = mysql_init(NULL);
+	if(conn == NULL){
+		cout << "Error " << mysql_errno(conn) << ": " << mysql_error(conn) << endl;
+        exit(1);
+	}
+
+	//mysql_real_connect( ..., database name, port number, unix socket, client flag)
+	if (mysql_real_connect(conn, host, username, password, NULL, 0, NULL, 0) == NULL ){
+        cout << "Error " << mysql_errno(conn) << ": " <<  mysql_error(conn) << endl;
+        exit(1);
+    }
+
+	//Connect to database "BTSignalRecords
+    if (mysql_query( conn, "USE BTSignalRecords")){
+        cout << "Error " << mysql_errno(conn) << ": " <<  mysql_error(conn) << endl;
+        exit(1);
+    }
+	
+	
+	//struct msghdr msgBuffer;
+	//Open N ( N = numberOfAdaptors ) bluetooth adaptors from adaptor 0 to N -1 
+	//This might cause problem if some adaptors are not usable.
+	//hci_open_dev( int dev_id) will return the socket the bluetooth connect to. 
+	//We need to store the socket for future connection
+	btSocketArray = new int[this->numberOfAdaptors];
+	for(int i=0; i < this->numberOfAdaptors; i++){
+		btSocketArray[i] = hci_open_dev(i);
+		debug && cout << "btSocketArray[" << i << "] = " << btSocketArray[i] << endl;
+	}
+
+}
 BluetoothController::~BluetoothController()
 {
 	mysql_close(conn);
@@ -407,9 +480,9 @@ void BluetoothController::decodeBTMsg( inquiry_info * btMsg, struct timeval time
 	//btSignalRecords table:
     //	timeDate, timeStamp, timeUSec, machineID, rssi, deviceClass
     snprintf(queryStatement, 256, 
-		"INSERT INTO btSignalRecords VALUES ('%s', '%s', '%lu', '%s', '0', '%s'  )", 
-		timeStringInDateTimeFormat, timeStampStringContainsMicroSecond , 
-		timeStamp.tv_usec, btMachineID, classInfo);
+		"INSERT INTO %s VALUES ('%d', '%s', '%s', '%lu', '%s', '0', '%s', 'StudentLounge'  )",
+		 table.c_str(), this->experimentIndex , timeStringInDateTimeFormat, timeStampStringContainsMicroSecond , 
+		 timeStamp.tv_usec, btMachineID, classInfo);
 
     mysql_query(conn, queryStatement);
 }
@@ -444,9 +517,10 @@ void BluetoothController::decodeBTMsg( inquiry_info_with_rssi * btMsg, struct ti
 	//btSignalRecords table:
     //	timeDate, timeStamp, timeUSec, machineID, rssi, deviceClass
     snprintf(queryStatement, 256, 
-		"INSERT INTO btSignalRecords VALUES ('%s', '%s', '%lu', '%s', '%d', '%s'  )", 
-		timeStringInDateTimeFormat, timeStampStringContainsMicroSecond , 
+		"INSERT INTO %s VALUES ('%d', '%s', '%s', '%lu', '%s', '%d', '%s', 'StudentLounge'  )", 
+		table.c_str(), this->experimentIndex,  timeStringInDateTimeFormat, timeStampStringContainsMicroSecond , 
 		timeStamp.tv_usec, btMachineID, btMsg->rssi, classInfo);
+			//c_str() convert the C++ string to char *
 
     mysql_query(conn, queryStatement);
 
@@ -463,8 +537,8 @@ void BluetoothController::getClassInfo(uint8_t dev_class[3], char * classInfo)
 
     if (major > ENT(majors) ){
         if (major == 63)
-           sprintf(buffer, " Unclassified device\n");
-            strcat( classInfo, buffer);
+           sprintf(buffer, " Unclassified device");
+           strcat( classInfo, buffer);
         return;
     }
     switch (major) {
@@ -503,8 +577,11 @@ void BluetoothController::getClassInfo(uint8_t dev_class[3], char * classInfo)
         if (minor <= ENT(toys)) sprintf(buffer," %s", toys[minor]);
         strcat( classInfo, buffer);
         break;
-    }
+	default:
+    	sprintf(buffer, " Unclassified device");
+    	strcat( classInfo, buffer);
+    	return;
+	}
     sprintf(buffer, " %s", majors[major]);
     strcat( classInfo, buffer);
 
-}
