@@ -1,10 +1,10 @@
-#include <mysql.h> //Now I use mysql C library for convenience. 
-				   //Should change to other C++ Mysql wrapper in the future
-
 #include <iostream>
 #include <bluetooth/bluetooth.h> //BlueZ only supplies C language
 #include <bluetooth/hci.h>
 #include <bluetooth/hci_lib.h>
+
+/* Communicate with a RESTful server using HTTP request provides by curl */
+#include <curl/curl.h>
 
 #include <cerrno>
 #include <cstdlib>
@@ -34,14 +34,10 @@ private:
 	unsigned char msgBuffer[HCI_MAX_FRAME_SIZE];
 	unsigned char controlBuffer[100];
 	
-	//Database connection
-	MYSQL *conn;
-	string table;
-	const static char * username;
-	const static char * password;
-	const static char * host;
-	//MYSQL_RES *result;
-	//MYSQL_ROW row;
+	CURL *curl;
+	CURLcode res;	
+	const static char * serverUpdateVisitors;
+	const static char * roomName;
 
 	int * btSocketArray;
 
@@ -52,6 +48,7 @@ private:
 	int numberOfAdaptors; // = number of inquirers
 	int inquiryTimeLength;
 		
+
 
 	const static char * majors[];// = {"Misc", "Computer"};
 	const static char * computers[];

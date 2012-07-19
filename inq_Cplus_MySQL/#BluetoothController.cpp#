@@ -2,8 +2,12 @@
 
 using namespace std;
 
-const char * BluetoothController::serverUpdateVisitors = "http://141.211.203.173:3000/rooms/update_visitors";
-const char * BluetoothController::roomName = "phd_office";
+//For MySQL database connection
+const char* BluetoothController::username = "multipleBT";
+const char* BluetoothController::password = "multipleBT";
+const char* BluetoothController::host = ""; //http://141.211.203.173:3000/rooms/update_visitors?name=phd_office&mac_addr=...
+
+// RESTful API to server, using curl
 
 //Need to define the constant at cpp, cannot define within the prototype in .h file
 const char* BluetoothController::majors[] = {"Misc", "Computer", "Phone", "Net Access", "Audio/Video",
@@ -30,9 +34,10 @@ const  char* BluetoothController::toys[] = {"Misc", "Robot", "Vehicle", "Charact
 
 BluetoothController::BluetoothController(int numberOfAdaptors, int inquiryTimeLength)
 {
-	debug = 0;
+	debug = 1;
 
 
+	this->table = "btSignalRecords";
 	this->numberOfAdaptors = numberOfAdaptors;
 	this->inquiryTimeLength = inquiryTimeLength;
 
@@ -45,7 +50,25 @@ BluetoothController::BluetoothController(int numberOfAdaptors, int inquiryTimeLe
 	debug && cout << "numberOfAdaptors = " << this->numberOfAdaptors << endl; 	
 	debug && cout << "inquiryTimeLength = " << this->inquiryTimeLength << endl;
 
+	//Data base connection
+	conn = mysql_init(NULL);
+	if(conn == NULL){
+		cout << "Error " << mysql_errno(conn) << ": " << mysql_error(conn) << endl;
+        exit(1);
+	}
 
+	//mysql_real_connect( ..., database name, port number, unix socket, client flag)
+	if (mysql_real_connect(conn, host, username, password, NULL, 0, NULL, 0) == NULL ){
+        cout << "Error " << mysql_errno(conn) << ": " <<  mysql_error(conn) << endl;
+        exit(1);
+    }
+
+	//Connect to database "BTSignalRecords
+    if (mysql_query( conn, "USE BTSignalRecords")){
+        cout << "Error " << mysql_errno(conn) << ": " <<  mysql_error(conn) << endl;
+        exit(1);
+    }
+	
 	
 	//struct msghdr msgBuffer;
 	//Open N ( N = numberOfAdaptors ) bluetooth adaptors from adaptor 0 to N -1 
@@ -75,6 +98,9 @@ BluetoothController::BluetoothController(int argc, char* argv[])
 	
 	debug = 1;
 
+	this->table = "btSignalRecordsForExperiment";
+
+	debug && cout << "Table = " << this->table << endl;
 	//For Experiment
 	this->experimentIndex = atoi(argv[1]);
 	this->experimentDistance = atoi(argv[2]);
@@ -91,6 +117,25 @@ BluetoothController::BluetoothController(int argc, char* argv[])
 	debug && cout << "Number of Inquirers = " << this->numberOfAdaptors << endl; 	
 	debug && cout << "inquiryTimeLength = " << this->inquiryTimeLength << endl;
 
+	//Data base connection
+	conn = mysql_init(NULL);
+	if(conn == NULL){
+		cout << "Error " << mysql_errno(conn) << ": " << mysql_error(conn) << endl;
+        exit(1);
+	}
+
+	//mysql_real_connect( ..., database name, port number, unix socket, client flag)
+	if (mysql_real_connect(conn, host, username, password, NULL, 0, NULL, 0) == NULL ){
+        cout << "Error " << mysql_errno(conn) << ": " <<  mysql_error(conn) << endl;
+        exit(1);
+    }
+
+	//Connect to database "BTSignalRecords
+    if (mysql_query( conn, "USE BTSignalRecords")){
+        cout << "Error " << mysql_errno(conn) << ": " <<  mysql_error(conn) << endl;
+        exit(1);
+    }
+	
 	
 	//struct msghdr msgBuffer;
 	//Open N ( N = numberOfAdaptors ) bluetooth adaptors from adaptor 0 to N -1 
@@ -106,6 +151,7 @@ BluetoothController::BluetoothController(int argc, char* argv[])
 }
 BluetoothController::~BluetoothController()
 {
+	mysql_close(conn);
 }
 
 void BluetoothController::run()
@@ -408,97 +454,77 @@ int BluetoothController::decodeBTEvent(int msgLengthFromBTSocket, struct timeval
 
 void BluetoothController::decodeBTMsg( inquiry_info * btMsg, struct timeval timeStamp)
 {
-//	struct tm timeInDateTimeFormat;
-//    char timeStampStringContainsMicroSecond[80];
-//    char timeStringInDateTimeFormat[80];
+	struct tm timeInDateTimeFormat;
+    char timeStampStringContainsMicroSecond[80];
+    char timeStringInDateTimeFormat[80];
     char btMachineID[18];
-//    char queryStatement[256];
-	char httpputUrl[256];
+    char queryStatement[256];
 
-	ba2str(&(btMsg->bdaddr), btMachineID);
+    ba2str(&(btMsg->bdaddr), btMachineID);
 	debug && cout << "find a nearby bluetooth devices: " << btMachineID << endl;
-
-	snprintf(httpputUrl, 256, "%s?name=%s&mac_addr=%s", serverUpdateVisitors, roomName, btMachineID);	
-
-	curl = curl_easy_init();
-	if(curl){
-		curl_easy_setopt(curl, CURLOPT_URL, httpputUrl);
-		
-		res = curl_easy_perform(curl);
-		
-		curl_easy_cleanup(curl);
-	}
-//    timeInDateTimeFormat = * localtime( &(timeStamp.tv_sec) );
+	
+    timeInDateTimeFormat = * localtime( &(timeStamp.tv_sec) );
     //convert the time to a human redable format
-//    strftime(timeStringInDateTimeFormat, sizeof(timeStringInDateTimeFormat),
-//        "%Y-%m-%d %H:%M:%S", &(timeInDateTimeFormat));
+    strftime(timeStringInDateTimeFormat, sizeof(timeStringInDateTimeFormat),
+        "%Y-%m-%d %H:%M:%S", &(timeInDateTimeFormat));
 
-//    sprintf(timeStampStringContainsMicroSecond, "%lu.%03lu\n", timeStamp.tv_sec, timeStamp.tv_usec);
-//    debug && printf("timeStampStringContainsMicroSeccond = %s", timeStampStringContainsMicroSecond);
-//    debug && printf("@ %s : %06lu ... \n", timeStringInDateTimeFormat, timeStamp.tv_usec);
-//    debug && printf("timeStamp.tv_sec = %8lu\n", timeStamp.tv_sec);
-//	debug && printf("timeStamp.tv_usec = %8lu\n", timeStamp.tv_usec);
+    sprintf(timeStampStringContainsMicroSecond, "%lu.%03lu\n", timeStamp.tv_sec, timeStamp.tv_usec);
+    debug && printf("timeStampStringContainsMicroSeccond = %s", timeStampStringContainsMicroSecond);
+    debug && printf("@ %s : %06lu ... \n", timeStringInDateTimeFormat, timeStamp.tv_usec);
+    debug && printf("timeStamp.tv_sec = %8lu\n", timeStamp.tv_sec);
+	debug && printf("timeStamp.tv_usec = %8lu\n", timeStamp.tv_usec);
 
 	//Get nearby device's device class information	
-//	char classInfo[30];
-//	classInfo[0] = '\0';
-//	getClassInfo(btMsg->dev_class, classInfo);
+	char classInfo[30];
+	classInfo[0] = '\0';
+	getClassInfo(btMsg->dev_class, classInfo);
 	
 	//btSignalRecords table:
     //	timeDate, timeStamp, timeUSec, machineID, rssi, deviceClass
-//    snprintf(queryStatement, 256, 
-//		"INSERT INTO %s VALUES ('%d', '%s', '%s', '%lu', '%s', '0', '%s', 'StudentLounge'  )",
-//		 table.c_str(), this->experimentIndex , timeStringInDateTimeFormat, timeStampStringContainsMicroSecond , 
-//		 timeStamp.tv_usec, btMachineID, classInfo);
+    snprintf(queryStatement, 256, 
+		"INSERT INTO %s VALUES ('%d', '%s', '%s', '%lu', '%s', '0', '%s', 'StudentLounge'  )",
+		 table.c_str(), this->experimentIndex , timeStringInDateTimeFormat, timeStampStringContainsMicroSecond , 
+		 timeStamp.tv_usec, btMachineID, classInfo);
 
+    mysql_query(conn, queryStatement);
 }
 
 
 void BluetoothController::decodeBTMsg( inquiry_info_with_rssi * btMsg, struct timeval timeStamp)
 {
-//	struct tm timeInDateTimeFormat;
-//    char timeStampStringContainsMicroSecond[80];
-//    char timeStringInDateTimeFormat[80];
+	struct tm timeInDateTimeFormat;
+    char timeStampStringContainsMicroSecond[80];
+    char timeStringInDateTimeFormat[80];
     char btMachineID[18];
-//    char queryStatement[256];
-	char httpputUrl[256];
+    char queryStatement[256];
 
     ba2str(&(btMsg->bdaddr), btMachineID);
 	debug && cout << "find a nearby bluetooth devices: " << btMachineID << endl;
 	
-	snprintf(httpputUrl, 256, "%s?name=%s&mac_addr=%s", serverUpdateVisitors, roomName, btMachineID);	
-
-	curl = curl_easy_init();
-	if(curl){
-		curl_easy_setopt(curl, CURLOPT_URL, httpputUrl);
-		
-		res = curl_easy_perform(curl);
-		
-		curl_easy_cleanup(curl);
-	}
-//    timeInDateTimeFormat = * localtime( &(timeStamp.tv_sec) );
+    timeInDateTimeFormat = * localtime( &(timeStamp.tv_sec) );
     //convert the time to a human redable format
-//    strftime(timeStringInDateTimeFormat, sizeof(timeStringInDateTimeFormat),
-//        "%Y-%m-%d %H:%M:%S", &(timeInDateTimeFormat));
+    strftime(timeStringInDateTimeFormat, sizeof(timeStringInDateTimeFormat),
+        "%Y-%m-%d %H:%M:%S", &(timeInDateTimeFormat));
 
-//    sprintf(timeStampStringContainsMicroSecond, "%lu.%03lu\n", timeStamp.tv_sec, timeStamp.tv_usec);
-//    debug && printf("timeStampStringContainsMicroSeccond = %s", timeStampStringContainsMicroSecond);
-//    debug && printf("@ %s : %06lu ... \n", timeStringInDateTimeFormat, timeStamp.tv_usec);
-//    debug && printf("timeStamp.tv_sec = %8lu\n", timeStamp.tv_sec);
-//	debug && printf("timeStamp.tv_usec = %8lu\n", timeStamp.tv_usec);
+    sprintf(timeStampStringContainsMicroSecond, "%lu.%03lu\n", timeStamp.tv_sec, timeStamp.tv_usec);
+    debug && printf("timeStampStringContainsMicroSeccond = %s", timeStampStringContainsMicroSecond);
+    debug && printf("@ %s : %06lu ... \n", timeStringInDateTimeFormat, timeStamp.tv_usec);
+    debug && printf("timeStamp.tv_sec = %8lu\n", timeStamp.tv_sec);
+	debug && printf("timeStamp.tv_usec = %8lu\n", timeStamp.tv_usec);
 
-//	char classInfo[30];
-//	classInfo[0] = '\0';
-//	getClassInfo(btMsg->dev_class, classInfo);
+	char classInfo[30];
+	classInfo[0] = '\0';
+	getClassInfo(btMsg->dev_class, classInfo);
 
 	//btSignalRecords table:
     //	timeDate, timeStamp, timeUSec, machineID, rssi, deviceClass
-	
-//    snprintf(queryStatement, 256, 
-//		"INSERT INTO %s VALUES ('%d', '%s', '%s', '%lu', '%s', '%d', '%s', 'StudentLounge'  )", 
-//		table.c_str(), this->experimentIndex,  timeStringInDateTimeFormat, timeStampStringContainsMicroSecond , 
-//		timeStamp.tv_usec, btMachineID, btMsg->rssi, classInfo);
+    snprintf(queryStatement, 256, 
+		"INSERT INTO %s VALUES ('%d', '%s', '%s', '%lu', '%s', '%d', '%s', 'StudentLounge'  )", 
+		table.c_str(), this->experimentIndex,  timeStringInDateTimeFormat, timeStampStringContainsMicroSecond , 
+		timeStamp.tv_usec, btMachineID, btMsg->rssi, classInfo);
 			//c_str() convert the C++ string to char *
+
+    mysql_query(conn, queryStatement);
 
 }
 
@@ -560,4 +586,4 @@ void BluetoothController::getClassInfo(uint8_t dev_class[3], char * classInfo)
 	}
     sprintf(buffer, " %s", majors[major]);
     strcat( classInfo, buffer);
-}
+
