@@ -2,7 +2,7 @@
 
 using namespace std;
 
-const char * BluetoothController::serverUpdateVisitors = "http://141.211.203.173:3000/rooms/update_visitors";
+const char * BluetoothController::serverUpdateVisitors = "http://67.194.47.118:3000/rooms/update_visitors";
 const char * BluetoothController::roomName = "phd_office";
 
 //Need to define the constant at cpp, cannot define within the prototype in .h file
