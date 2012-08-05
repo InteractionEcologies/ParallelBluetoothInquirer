@@ -45,3 +45,9 @@ Bluetooth User Manual:
 
 3. Turn off Bluetooth Detecter
   ctrl + C
+
+MySQLToXMLParser Manual
+1. Go to Develop/multipleBT-Git/inq_Cplus_MySQL/MySqlToXMLParser/
+2. Parsing 
+  $ php MySqlToXMLParser.php
+3. And then you will see lots of xml files with file name btID_<id>.xml
