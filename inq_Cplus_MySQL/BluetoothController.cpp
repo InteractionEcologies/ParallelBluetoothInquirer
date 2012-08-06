@@ -2,8 +2,8 @@
 
 using namespace std;
 
-const char * BluetoothController::serverUpdateVisitors = "http://67.194.47.118:3000/rooms/update_visitors";
-const char * BluetoothController::roomName = "phd_office";
+const char * BluetoothController::serverUpdateVisitors = "http://67.194.34.67:8000/bluetooth/";
+//const char * BluetoothController::roomName = "phd_office";
 
 //Need to define the constant at cpp, cannot define within the prototype in .h file
 const char* BluetoothController::majors[] = {"Misc", "Computer", "Phone", "Net Access", "Audio/Video",
@@ -30,7 +30,7 @@ const  char* BluetoothController::toys[] = {"Misc", "Robot", "Vehicle", "Charact
 
 BluetoothController::BluetoothController(int numberOfAdaptors, int inquiryTimeLength)
 {
-	debug = 0;
+	debug = 1;
 
 
 	this->numberOfAdaptors = numberOfAdaptors;
@@ -418,13 +418,17 @@ void BluetoothController::decodeBTMsg( inquiry_info * btMsg, struct timeval time
 	ba2str(&(btMsg->bdaddr), btMachineID);
 	debug && cout << "find a nearby bluetooth devices: " << btMachineID << endl;
 
-	snprintf(httpputUrl, 256, "%s?name=%s&mac_addr=%s", serverUpdateVisitors, roomName, btMachineID);	
-
+	snprintf(httpputUrl, 256, "%s%s/", serverUpdateVisitors, btMachineID);	
+	
+	printf("**************** %s\n", httpputUrl);
 	curl = curl_easy_init();
 	if(curl){
 		curl_easy_setopt(curl, CURLOPT_URL, httpputUrl);
 		
 		res = curl_easy_perform(curl);
+		
+		if(res != CURLE_OK)
+		fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
 		
 		curl_easy_cleanup(curl);
 	}
@@ -466,8 +470,9 @@ void BluetoothController::decodeBTMsg( inquiry_info_with_rssi * btMsg, struct ti
     ba2str(&(btMsg->bdaddr), btMachineID);
 	debug && cout << "find a nearby bluetooth devices: " << btMachineID << endl;
 	
-	snprintf(httpputUrl, 256, "%s?name=%s&mac_addr=%s", serverUpdateVisitors, roomName, btMachineID);	
+	snprintf(httpputUrl, 256, "%s%s/", serverUpdateVisitors, btMachineID);	
 
+	printf("**************** %s\n", httpputUrl);
 	curl = curl_easy_init();
 	if(curl){
 		curl_easy_setopt(curl, CURLOPT_URL, httpputUrl);
