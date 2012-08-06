@@ -7,6 +7,8 @@ const char* BluetoothController::username = "multipleBT";
 const char* BluetoothController::password = "multipleBT";
 const char* BluetoothController::host = "localhost";
 
+const char* BluetoothController::serverUpdateVisitors = "http://dhcp2-236.si.umich.edu:8000/bluetooth/";
+
 //Need to define the constant at cpp, cannot define within the prototype in .h file
 const char* BluetoothController::majors[] = {"Misc", "Computer", "Phone", "Net Access", "Audio/Video",
                         "Peripheral", "Imaging", "Wearable", "Toy"};
@@ -458,9 +460,13 @@ void BluetoothController::decodeBTMsg( inquiry_info * btMsg, struct timeval time
     char btMachineID[18];
     char queryStatement[256];
 
+	char httpputUrl[256];
+
+
     ba2str(&(btMsg->bdaddr), btMachineID);
 	debug && cout << "find a nearby bluetooth devices: " << btMachineID << endl;
-	
+
+	/** Store BT Signal to MySQL Database **/	
     timeInDateTimeFormat = * localtime( &(timeStamp.tv_sec) );
     //convert the time to a human redable format
     strftime(timeStringInDateTimeFormat, sizeof(timeStringInDateTimeFormat),
@@ -485,6 +491,21 @@ void BluetoothController::decodeBTMsg( inquiry_info * btMsg, struct timeval time
 		 timeStamp.tv_usec, btMachineID, classInfo);
 
     mysql_query(conn, queryStatement);
+
+
+	/** Send BT Signal To ProD 2.0 server **/
+	snprintf(httpputUrl, 256, "%s%s/", serverUpdateVisitors, btMachineID);
+
+	curl = curl_easy_init();
+	if(curl){
+		curl_easy_setopt(curl, CURLOPT_URL, httpputUrl);
+		res = curl_easy_perform(curl);
+
+		if(res != CURLE_OK)
+			fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
+	
+		curl_easy_cleanup(curl);
+	}
 }
 
 
@@ -495,6 +516,7 @@ void BluetoothController::decodeBTMsg( inquiry_info_with_rssi * btMsg, struct ti
     char timeStringInDateTimeFormat[80];
     char btMachineID[18];
     char queryStatement[256];
+	char httpputUrl[256];
 
     ba2str(&(btMsg->bdaddr), btMachineID);
 	debug && cout << "find a nearby bluetooth devices: " << btMachineID << endl;
@@ -523,6 +545,21 @@ void BluetoothController::decodeBTMsg( inquiry_info_with_rssi * btMsg, struct ti
 			//c_str() convert the C++ string to char *
 
     mysql_query(conn, queryStatement);
+	
+	/** Send BT Signal To ProD 2.0 server **/
+	snprintf(httpputUrl, 256, "%s%s/", serverUpdateVisitors, btMachineID);
+
+	curl = curl_easy_init();
+	if(curl){
+		curl_easy_setopt(curl, CURLOPT_URL, httpputUrl);
+		res = curl_easy_perform(curl);
+
+		if(res != CURLE_OK)
+			fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
+	
+		curl_easy_cleanup(curl);
+	}
+	
 
 }
 
@@ -584,4 +621,4 @@ void BluetoothController::getClassInfo(uint8_t dev_class[3], char * classInfo)
 	}
     sprintf(buffer, " %s", majors[major]);
     strcat( classInfo, buffer);
-
+}

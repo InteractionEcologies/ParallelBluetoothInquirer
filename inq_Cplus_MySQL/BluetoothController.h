@@ -6,6 +6,9 @@
 #include <bluetooth/hci.h>
 #include <bluetooth/hci_lib.h>
 
+/* Communicate with a RESTful server using HTTP request provides by curl */
+#include <curl/curl.h>
+
 #include <cerrno>
 #include <cstdlib>
 #include <time.h>
@@ -43,6 +46,12 @@ private:
 	//MYSQL_RES *result;
 	//MYSQL_ROW row;
 
+	// HTTP Request
+	CURL *curl;
+	CURLcode res;
+	const static char * serverUpdateVisitors;
+	const static char * roomName;
+	
 	int * btSocketArray;
 
 	int experimentIndex;
