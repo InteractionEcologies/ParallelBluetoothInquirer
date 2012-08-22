@@ -1,8 +1,13 @@
 #include "BluetoothController.h"
 
 using namespace std;
+const string BluetoothController::getUsernameFromServerUrl = "http://dhcp2-236.si.umich.edu:8000/bluetooth/mac_to_user/";
+const int BluetoothController::serverPortNumber= 8000;
 
-const char * BluetoothController::serverUpdateVisitors = "http://67.194.34.67:8000/bluetooth/";
+const string BluetoothController::redisServerName = "dhcp2-236.si.umich.edu";
+const int BluetoothController::redisPortNumber = 6379;
+
+const string BluetoothController::redisNearbyBTUsersHS = "nearby_bt_users_HS";
 //const char * BluetoothController::roomName = "phd_office";
 
 //Need to define the constant at cpp, cannot define within the prototype in .h file
@@ -58,7 +63,17 @@ BluetoothController::BluetoothController(int numberOfAdaptors, int inquiryTimeLe
 		debug && cout << "btSocketArray[" << i << "] = " << btSocketArray[i] << endl;
 	}
 
-	
+	//Connect to Redis
+	rc = redisConnect(redisServerName.c_str(), redisPortNumber);
+	if(rc->err){
+		cout << "Connection error: " << rc->errstr << endl;
+		exit(1);
+	}	
+
+	//PING server to check connection
+	//reply = (redisReply*) redisCommand(rc, "PING");
+	//cout << "PING: " << reply->str << endl;
+	//freeReplyObject(reply);
 }
 
 
@@ -106,6 +121,7 @@ BluetoothController::BluetoothController(int argc, char* argv[])
 }
 BluetoothController::~BluetoothController()
 {
+
 }
 
 void BluetoothController::run()
@@ -406,19 +422,136 @@ int BluetoothController::decodeBTEvent(int msgLengthFromBTSocket, struct timeval
 	return EXIT_SUCCESS;	
 }
 
+string BluetoothController::getUsernameFromCache(string mac_addr)
+{
+	string username = UsernameCache[mac_addr];
+	if(username.empty()){
+		cout << "mac_addr is not in the cache" << endl;
+		return "";
+	} else {
+		cout << "find mac_addr in the cache: " << username << endl;
+		return username;
+	}
+	return "";
+}
+
+string BluetoothController::getUsernameFromServer(string mac_addr)
+{
+	string httpGetUrl = this->getUsernameFromServerUrl;
+	string username;
+	httpGetUrl += mac_addr;
+	httpGetUrl += "/";
+	try  {
+		cURLpp::Cleanup mCleanup;
+	
+		// Creation of the URL option
+		cURLpp::Options::Url mUrl(httpGetUrl);
+
+		// Creation of the port option
+		cURLpp::Options::Port mPort(this->serverPortNumber);
+		
+		// Creation of the request
+		cURLpp::Easy mRequest;
+		mRequest.setOpt(cURLpp::Options::Url(mUrl));
+		
+
+		// You don't need to declare an option if you just want to use it once
+		//mRequest.setOpt(new cURLpp::Options:Url("test.com"));
+		mRequest.perform();
+		stringstream result;
+		result << mRequest;
+		username = jsonParser(result);
+	
+	} catch ( cURLpp::RuntimeError &e ){
+		cout << e.what() << endl;
+	} catch ( cURLpp::LogicError &e ){
+		cout << e.what() << endl;
+	}
+		
+	
+
+	return username;
+}
+
+string BluetoothController::jsonParser(stringstream &json)
+{
+	Value v;
+	Stream_reader<stringstream, Value> reader(json);
+	reader.read_next(v);
+	string s;
+	// Only support reading a string 
+	switch(v.type()){
+		case str_type:
+			cout << "Find a registed user" << endl;
+			s = v.get_value<string>();
+			return s;
+			break;
+		case null_type:
+			cout << "Cannot find this bluetooth mac_addr" << endl;
+			break;
+		default:
+			cout << "HttpResponse JSON Type error" << endl;
+			break;
+	}
+	return ""; //empty string
+	
+}
+string BluetoothController::getUsername(string mac_addr)
+{
+	string username;
+	username = getUsernameFromCache(mac_addr);
+	if(username.empty())
+		username = getUsernameFromServer(mac_addr);
+		if(!username.empty()){
+			// Add into the cache
+			UsernameCache[mac_addr] = username;
+		} else {
+			return ""; //empty string
+		}
+	return username;
+}
+
+void BluetoothController::updateNearbyBTUsersInRedis(string username, struct timeval timestamp)
+{
+	// Convert timestamp to a string
+	string ts = lexical_cast<string>(timestamp.tv_sec);
+	
+	// Construct the command
+	string command = "HSET ";
+	command += redisNearbyBTUsersHS;
+	command += " ";
+	command += username;
+	command += " ";
+	command += ts;
+	cout << "Redis ... " << endl;
+	cout << "Redis ... Command: " << command << endl;
+	cout << "Redis ... user timestamp: " << ts << endl;
+	reply = (redisReply*) redisCommand(rc, command.c_str());
+	cout << "Redis ... Reply: " << reply << endl;
+	freeReplyObject(reply);
+}
 void BluetoothController::decodeBTMsg( inquiry_info * btMsg, struct timeval timeStamp)
 {
 //	struct tm timeInDateTimeFormat;
 //    char timeStampStringContainsMicroSecond[80];
 //    char timeStringInDateTimeFormat[80];
-    char btMachineID[18];
+	char btMachineID[18];
 //    char queryStatement[256];
 	char httpputUrl[256];
+	string bt;
+	string username;
 
 	ba2str(&(btMsg->bdaddr), btMachineID);
-	debug && cout << "find a nearby bluetooth devices: " << btMachineID << endl;
+	bt = string(btMachineID);
+	debug && cout << "find a nearby bluetooth devices: " << bt << endl;
 
-	snprintf(httpputUrl, 256, "%s%s/", serverUpdateVisitors, btMachineID);	
+	username = getUsername(bt);
+	if(!username.empty())
+		updateNearbyBTUsersInRedis(username, timeStamp);
+
+	/*snprintf(httpputUrl, 256, "%s%s/", serverUpdateVisitors, btMachineID);	
+
+	
 	
 	printf("**************** %s\n", httpputUrl);
 	curl = curl_easy_init();
@@ -432,6 +565,8 @@ void BluetoothController::decodeBTMsg( inquiry_info * btMsg, struct timeval time
 		
 		curl_easy_cleanup(curl);
 	}
+*/
+
 //    timeInDateTimeFormat = * localtime( &(timeStamp.tv_sec) );
     //convert the time to a human redable format
 //    strftime(timeStringInDateTimeFormat, sizeof(timeStringInDateTimeFormat),
@@ -463,14 +598,21 @@ void BluetoothController::decodeBTMsg( inquiry_info_with_rssi * btMsg, struct ti
 //	struct tm timeInDateTimeFormat;
 //    char timeStampStringContainsMicroSecond[80];
 //    char timeStringInDateTimeFormat[80];
-    char btMachineID[18];
+	char btMachineID[18];
 //    char queryStatement[256];
 	char httpputUrl[256];
-
-    ba2str(&(btMsg->bdaddr), btMachineID);
-	debug && cout << "find a nearby bluetooth devices: " << btMachineID << endl;
+	string bt;
+	string username;
+    	ba2str(&(btMsg->bdaddr), btMachineID);
+	bt = string(btMachineID);
+	debug && cout << "find a nearby bluetooth devices: " << bt << endl;
 	
-	snprintf(httpputUrl, 256, "%s%s/", serverUpdateVisitors, btMachineID);	
+
+	username = getUsername(bt);
+	if(!username.empty())
+		updateNearbyBTUsersInRedis(username, timeStamp);
+	
+/*	snprintf(httpputUrl, 256, "%s%s/", serverUpdateVisitors, btMachineID);	
 
 	printf("**************** %s\n", httpputUrl);
 	curl = curl_easy_init();
@@ -481,6 +623,7 @@ void BluetoothController::decodeBTMsg( inquiry_info_with_rssi * btMsg, struct ti
 		
 		curl_easy_cleanup(curl);
 	}
+*/
 //    timeInDateTimeFormat = * localtime( &(timeStamp.tv_sec) );
     //convert the time to a human redable format
 //    strftime(timeStringInDateTimeFormat, sizeof(timeStringInDateTimeFormat),
@@ -566,3 +709,4 @@ void BluetoothController::getClassInfo(uint8_t dev_class[3], char * classInfo)
     sprintf(buffer, " %s", majors[major]);
     strcat( classInfo, buffer);
 }
+
