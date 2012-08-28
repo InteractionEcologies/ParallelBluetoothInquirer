@@ -4,10 +4,11 @@ using namespace std;
 const string BluetoothController::getUsernameFromServerUrl = "http://dhcp2-236.si.umich.edu:8000/bluetooth/mac_to_user/";
 const int BluetoothController::serverPortNumber= 8000;
 
-const string BluetoothController::redisServerName = "dhcp2-236.si.umich.edu";
+const string BluetoothController::redisServerName = "gauravparuthi.com";
 const int BluetoothController::redisPortNumber = 6379;
 
 const string BluetoothController::redisNearbyBTUsersHS = "nearby_bt_users_HS";
+const string BluetoothController::redisNearbyBTUsersCH = "nearby_bt_users_CH";
 //const char * BluetoothController::roomName = "phd_office";
 
 //Need to define the constant at cpp, cannot define within the prototype in .h file
@@ -426,10 +427,10 @@ string BluetoothController::getUsernameFromCache(string mac_addr)
 {
 	string username = UsernameCache[mac_addr];
 	if(username.empty()){
-		cout << "mac_addr is not in the cache" << endl;
+		cout << "Cache ... mac_addr is not in the cache" << endl;
 		return "";
 	} else {
-		cout << "find mac_addr in the cache: " << username << endl;
+		cout << "Cache ... find mac_addr in the cache. User: " << username << endl;
 		return username;
 	}
 	return "";
@@ -482,15 +483,14 @@ string BluetoothController::jsonParser(stringstream &json)
 	// Only support reading a string 
 	switch(v.type()){
 		case str_type:
-			cout << "Find a registed user" << endl;
-			s = v.get_value<string>();
+			debug && cout << "JSON Parser ... Return format correct. User: " << endl; s = v.get_value<string>();
 			return s;
 			break;
 		case null_type:
-			cout << "Cannot find this bluetooth mac_addr" << endl;
+			debug && cout << "JSON Parser ... Cannot find this bluetooth mac_addr" << endl;
 			break;
 		default:
-			cout << "HttpResponse JSON Type error" << endl;
+			debug && cout << "JSON Parser ... Return format wrong" << endl;
 			break;
 	}
 	return ""; //empty string
@@ -526,6 +526,17 @@ void BluetoothController::updateNearbyBTUsersInRedis(string username, struct tim
 	cout << "Redis ... " << endl;
 	cout << "Redis ... Command: " << command << endl;
 	cout << "Redis ... user timestamp: " << ts << endl;
+	reply = (redisReply*) redisCommand(rc, command.c_str());
+	cout << "Redis ... Reply: " << reply << endl;
+	freeReplyObject(reply);
+
+	// Inform all the subscribers of who's timestamp is changed
+	cout << "Redis ... " << endl;
+	command = "PUBLISH ";
+	command += redisNearbyBTUsersCH;
+	command += " ";
+	command += username;
+	cout << "Redis ... Command: " << command << endl;
 	reply = (redisReply*) redisCommand(rc, command.c_str());
 	cout << "Redis ... Reply: " << reply << endl;
 	freeReplyObject(reply);

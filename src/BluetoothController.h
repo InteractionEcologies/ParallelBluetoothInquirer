@@ -61,7 +61,7 @@ private:
 	const static string redisServerName;
 	const static int redisPortNumber;
 	const static string redisNearbyBTUsersHS;
-	
+	const static string redisNearbyBTUsersCH;	
 
 	// A table cached all the user and mac_add mappings 
 	map<string, string> UsernameCache; // <mac_addr, username>	
