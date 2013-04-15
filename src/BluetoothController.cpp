@@ -463,9 +463,16 @@ string BluetoothController::getUsernameFromLocalRedis(string mac_addr)
 	// cout << "Redis ... Command: " << command << endl;
 	// cout << "Redis ... user timestamp: " << ts << endl;
 	reply = (redisReply*) redisCommand(rcLocal, command.c_str());
-	cout << "Redis ... Reply: " << reply << endl;
 	
-	result = result + reply->str;
+	cout << "Redis command ... " << command.c_str() << endl;
+	//cout << "Redis ... Reply: " << reply << endl;
+	//cout << "Redis ... Reply->str " << reply->str << endl;
+	if( reply->type == REDIS_REPLY_NIL ){	
+		result = "";
+	} else {
+		result = result + reply->str;
+		cout << "username: " << result << endl;
+	}
 	freeReplyObject(reply);
 
 
