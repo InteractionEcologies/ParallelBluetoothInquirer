@@ -57,7 +57,7 @@ private:
 	
 	// Redis, bluetooth inquirer needs to put the user and a timestamp to a presence_bluetooths_HS { key="user", value="timestamp" }
 	redisContext *rc;
-	edisContext *rcLocal;
+	redisContext *rcLocal;
 	redisReply *reply;
 	const static string redisServerName;
 	const static string redisLocalServerName;
