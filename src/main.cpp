@@ -30,7 +30,7 @@ int main(int argc, char* argv[])
 	} else {
 		//default setting
 		//BluetoothController(numOfDetectors, inquiryTimeLength
-		BluetoothController * btController = new BluetoothController(4, 10);
+		BluetoothController * btController = new BluetoothController(6, 15);
 		btController->run();
 
 		delete btController;

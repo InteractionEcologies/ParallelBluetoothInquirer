@@ -1,8 +1,9 @@
 #include "BluetoothController.h"
 
 using namespace std;
-const string BluetoothController::getUsernameFromServerUrl = "http://dhcp2-236.si.umich.edu:8000/bluetooth/mac_to_user/";
-const int BluetoothController::serverPortNumber= 8000;
+const string BluetoothController::getUsernameFromServerUrl = "http://www.stonesoup.im/bluetooth/mac_to_user/";
+
+const int BluetoothController::serverPortNumber= 80;
 
 const string BluetoothController::redisServerName = "gauravparuthi.com";
 const int BluetoothController::redisPortNumber = 6379;
