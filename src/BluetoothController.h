@@ -57,6 +57,7 @@ private:
 	
 	// Redis, bluetooth inquirer needs to put the user and a timestamp to a presence_bluetooths_HS { key="user", value="timestamp" }
 	redisContext *rc;
+	edisContext *rcLocal;
 	redisReply *reply;
 	const static string redisServerName;
 	const static string redisLocalServerName;
@@ -113,7 +114,7 @@ private:
 
 
 	string getUsernameFromLocalRedis(string mac_addr);
-	
+
 	/** Get a username from mac_addr
 	*	First check the UsernameCache, 
 	*	If it is not there, request the server to get the username

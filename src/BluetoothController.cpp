@@ -13,7 +13,7 @@ const int BluetoothController::redisPortNumber = 6379;
 const string BluetoothController::redisNearbyBTUsersHS = "nearby_bt_users_HS";
 const string BluetoothController::redisNearbyBTUsersCH = "nearby_bt_users_CH";
 
-const string BluetoothController::redisLocalMacToUsernameHS = 'mac_to_user_HS';
+const string BluetoothController::redisLocalMacToUsernameHS = "mac_to_user_HS";
 //const char * BluetoothController::roomName = "phd_office";
 
 //Need to define the constant at cpp, cannot define within the prototype in .h file
@@ -452,6 +452,7 @@ string BluetoothController::getUsernameFromLocalRedis(string mac_addr)
 {
 	
 	// Construct the command
+	string result = "";
 	string command = "HGET ";
 	command += redisLocalMacToUsernameHS;
 	command += " ";
@@ -463,9 +464,12 @@ string BluetoothController::getUsernameFromLocalRedis(string mac_addr)
 	// cout << "Redis ... user timestamp: " << ts << endl;
 	reply = (redisReply*) redisCommand(rcLocal, command.c_str());
 	cout << "Redis ... Reply: " << reply << endl;
+	
+	result = result + reply->str;
 	freeReplyObject(reply);
 
-	return reply;
+
+	return result;
 
 }
 
