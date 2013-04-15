@@ -6,10 +6,14 @@ const string BluetoothController::getUsernameFromServerUrl = "http://www.stoneso
 const int BluetoothController::serverPortNumber= 80;
 
 const string BluetoothController::redisServerName = "gauravparuthi.com";
+const string BluetoothController::redisLocalServerName = "localhost";
+
 const int BluetoothController::redisPortNumber = 6379;
 
 const string BluetoothController::redisNearbyBTUsersHS = "nearby_bt_users_HS";
 const string BluetoothController::redisNearbyBTUsersCH = "nearby_bt_users_CH";
+
+const string BluetoothController::redisLocalMacToUsernameHS = 'mac_to_user_HS';
 //const char * BluetoothController::roomName = "phd_office";
 
 //Need to define the constant at cpp, cannot define within the prototype in .h file
@@ -69,6 +73,13 @@ BluetoothController::BluetoothController(int numberOfAdaptors, int inquiryTimeLe
 	rc = redisConnect(redisServerName.c_str(), redisPortNumber);
 	if(rc->err){
 		cout << "Connection error: " << rc->errstr << endl;
+		exit(1);
+	}	
+
+	//Connect to local Redis
+	rcLocal = redisConnect(redisLocalServerName.c_str(), redisPortNumber);
+	if(rcLocal->err){
+		cout << "Connection error: " << rcLocal->errstr << endl;
 		exit(1);
 	}	
 
@@ -437,6 +448,27 @@ string BluetoothController::getUsernameFromCache(string mac_addr)
 	return "";
 }
 
+string BluetoothController::getUsernameFromLocalRedis(string mac_addr)
+{
+	
+	// Construct the command
+	string command = "HGET ";
+	command += redisLocalMacToUsernameHS;
+	command += " ";
+	command += mac_addr;
+	// command += " ";
+	// command += ts;
+	// cout << "Redis ../. " << endl;
+	// cout << "Redis ... Command: " << command << endl;
+	// cout << "Redis ... user timestamp: " << ts << endl;
+	reply = (redisReply*) redisCommand(rcLocal, command.c_str());
+	cout << "Redis ... Reply: " << reply << endl;
+	freeReplyObject(reply);
+
+	return reply;
+
+}
+
 string BluetoothController::getUsernameFromServer(string mac_addr)
 {
 	string httpGetUrl = this->getUsernameFromServerUrl;
@@ -502,7 +534,7 @@ string BluetoothController::getUsername(string mac_addr)
 	string username;
 	username = getUsernameFromCache(mac_addr);
 	if(username.empty())
-		username = getUsernameFromServer(mac_addr);
+		username = getUsernameFromLocalRedis(mac_addr);
 		if(!username.empty()){
 			// Add into the cache
 			UsernameCache[mac_addr] = username;

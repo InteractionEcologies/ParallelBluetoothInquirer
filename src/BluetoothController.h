@@ -59,10 +59,13 @@ private:
 	redisContext *rc;
 	redisReply *reply;
 	const static string redisServerName;
+	const static string redisLocalServerName;
+
 	const static int redisPortNumber;
 	const static string redisNearbyBTUsersHS;
 	const static string redisNearbyBTUsersCH;	
 
+	const static string redisLocalMacToUsernameHS;
 	// A table cached all the user and mac_add mappings 
 	map<string, string> UsernameCache; // <mac_addr, username>	
 
@@ -108,6 +111,9 @@ private:
 	*/ 
 	string getUsernameFromCache(string mac_addr);
 
+
+	string getUsernameFromLocalRedis(string mac_addr);
+	
 	/** Get a username from mac_addr
 	*	First check the UsernameCache, 
 	*	If it is not there, request the server to get the username
